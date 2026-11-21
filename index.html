@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Beach Football 3D — HD Edition</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#79c9e8;font-family:system-ui,Arial;color:#fff}
+#game{position:fixed;inset:0}canvas{display:block}
+#hud{position:fixed;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;align-items:center;pointer-events:none;gap:8px}
+.pill{background:linear-gradient(135deg,#06243be8,#07516cce);border:1px solid #ffffff66;border-radius:15px;padding:9px 14px;font-weight:900;box-shadow:0 5px 18px #001a2c55;text-shadow:0 2px 3px #000}
+#hint{position:fixed;top:62px;left:50%;transform:translateX(-50%);background:#062d43c9;border:1px solid #ffffff44;border-radius:12px;padding:7px 12px;font-size:13px;white-space:nowrap;text-align:center;box-shadow:0 4px 15px #001a2c44}
+#controls{position:fixed;bottom:18px;left:0;right:0;display:flex;justify-content:space-between;align-items:end;padding:0 18px;pointer-events:none}
+.pad{display:grid;grid-template-columns:repeat(3,54px);grid-template-rows:repeat(2,54px);gap:5px;pointer-events:auto}
+.ctrl,.action{border:1px solid #ffffff99;background:linear-gradient(145deg,#0b4563e8,#06273ddd);color:white;border-radius:15px;font-size:20px;font-weight:900;touch-action:none;box-shadow:0 4px 0 #031723,0 7px 15px #00152266}
+.ctrl:active,.action:active{filter:brightness(1.3);transform:translateY(3px);box-shadow:0 1px 0 #031723}
+#up{grid-column:2}#left{grid-column:1;grid-row:2}#down{grid-column:2;grid-row:2}#right{grid-column:3;grid-row:2}
+.actions{display:flex;gap:10px;pointer-events:auto}.action{width:72px;height:72px;border-radius:50%;font-size:14px;background:linear-gradient(145deg,#ff9b35,#c94c13)}
+#pass{background:linear-gradient(145deg,#25c9d4,#08718c)}
+#note{position:fixed;bottom:4px;left:50%;transform:translateX(-50%);font-size:10px;color:#fff;text-shadow:0 1px 4px #000;white-space:nowrap}
+#menu{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#031b32d9,#034c65a8);backdrop-filter:blur(5px);z-index:5;padding:18px}
+.panel{width:min(430px,94vw);background:linear-gradient(150deg,#07324aF2,#061b31F2);border:1px solid #ffffff55;border-radius:24px;padding:24px;text-align:center;box-shadow:0 20px 60px #00111f88}
+.panel h1{font-size:clamp(26px,7vw,40px);margin:0 0 4px;color:#8beaff}.panel p{color:#d5edf5;margin:5px 0 18px}
+.panel label{display:block;text-align:right;margin:12px 0 6px;color:#ccecf6;font-weight:700}
+.panel select,.panel button{width:100%;padding:13px;border-radius:12px;border:1px solid #ffffff66;font:inherit;font-weight:800}
+.panel select{background:#0c4962;color:#fff}.panel button{margin-top:14px;background:linear-gradient(135deg,#18b7c5,#08708d);color:white;font-size:18px;box-shadow:0 4px 0 #034254}
+#soundToggle{position:fixed;top:66px;right:12px;z-index:3;border:1px solid #ffffff66;border-radius:12px;background:#062d43cc;color:white;padding:7px 11px}
+#commentary{position:fixed;top:106px;left:50%;transform:translateX(-50%);background:#062d43b8;border-radius:10px;padding:6px 12px;font-size:12px;opacity:0;transition:opacity .25s;pointer-events:none}
+@media(min-width:800px){#controls{opacity:.8}.pad{grid-template-columns:repeat(3,60px);grid-template-rows:repeat(2,60px)}}
+</style></head><body>
+<div id="game"></div><div id="hud"><div class="pill">BEACH FOOTBALL <span style="color:#70e5ff">HD</span></div><div class="pill" id="score">أنت 0 - 0 الخصم</div></div>
+<div id="hint">WASD أو الأسهم للحركة • اضغط تسديد أو تمرير قرب الكرة</div>
+<div id="controls"><div class="pad"><button class="ctrl" id="up">▲</button><button class="ctrl" id="left">◀</button><button class="ctrl" id="down">▼</button><button class="ctrl" id="right">▶</button></div><div class="actions"><button class="action" id="pass">تمرير</button><button class="action" id="shoot">تسديد</button></div></div>
+<div id="note">إصدار المدرجات والحراس والاحتفال — الأونلاين يحتاج خادم</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+(()=>{
+const root=document.getElementById('game');if(!window.THREE){document.getElementById('hint').textContent='اتصل بالإنترنت لتحميل محرك اللعبة';return}
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x8bd7f2);scene.fog=new THREE.Fog(0x8bd7f2,65,155);
+const camera=new THREE.PerspectiveCamera(48,innerWidth/innerHeight,.1,300);camera.position.set(0,26,39);
+const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.12;root.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xdff8ff,0x41613e,2.0));
+const sun=new THREE.DirectionalLight(0xfff0d6,3.0);sun.position.set(-28,45,25);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-55;sun.shadow.camera.right=55;sun.shadow.camera.top=55;sun.shadow.camera.bottom=-55;sun.shadow.bias=-.00025;scene.add(sun);
+const fill=new THREE.DirectionalLight(0x8bdcff,.8);fill.position.set(25,15,-35);scene.add(fill);
+const mat=(c,r=.8,m=0)=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m});
+function mesh(geo,material,x=0,y=0,z=0,parent=scene){const o=new THREE.Mesh(geo,material);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;parent.add(o);return o}
+function cube(w,h,d,m,x,y,z){return mesh(new THREE.BoxGeometry(w,h,d),m,x,y,z)}
+// Sand island
+cube(190,.5,190,mat(0xe6cc91),0,-.48,-26);
+// Procedural blue ocean with gentle vertex waves
+const waterGeo=new THREE.PlaneGeometry(190,90,100,55);waterGeo.rotateX(-Math.PI/2);
+const waterMat=new THREE.MeshStandardMaterial({color:0x078eae,roughness:.23,metalness:.16,transparent:false});
+const water=mesh(waterGeo,waterMat,0,-.08,-91);water.receiveShadow=false;
+const waterPositions=waterGeo.attributes.position;const waterBase=Float32Array.from(waterPositions.array);
+// distant horizon and island cliffs
+const horizon=cube(190,2,2,mat(0x4d9d9b),0,-1,-137);horizon.castShadow=false;
+// Grass pitch with procedural stripes
+const grassMat=mat(0x287b38,.95);cube(42,.28,62,grassMat,0,-.06,0);
+for(let i=0;i<7;i++){const stripe=cube(6,.012,61,mat(i%2?0x2d8740:0x246f34),-18+i*6,.09,0);stripe.castShadow=false}
+const white=mat(0xffffff,.55);
+function line(w,d,x,z){const o=cube(w,.035,d,white,x,.105,z);o.castShadow=false}
+line(42,.18,0,31);line(42,.18,0,-31);line(.18,62,-21,0);line(.18,62,21,0);line(42,.16,0,0);
+const center=new THREE.Mesh(new THREE.TorusGeometry(7,.075,10,80),white);center.rotation.x=Math.PI/2;center.position.y=.12;scene.add(center);
+function boxArea(z){line(22,.14,0,z);line(.14,13,0,z+(z>0?-6.5:6.5));line(22,.14,0,z+(z>0?-13:13))}
+boxArea(31);boxArea(-31);
+const spot=mesh(new THREE.CircleGeometry(.22,20),white,0,.12,0);spot.rotation.x=-Math.PI/2;
+// Goal posts, crossbar and net
+function goal(z){const g=new THREE.Group(),metal=mat(0xf5f8f8,.25,.4);[-5.3,5.3].forEach(x=>mesh(new THREE.CylinderGeometry(.14,.14,4.4,16),metal,x,2.2,0,g));mesh(new THREE.CylinderGeometry(.14,.14,10.6,16),metal,0,4.4,0,g).rotation.z=Math.PI/2;
+const netMat=new THREE.MeshBasicMaterial({color:0xffffff,wireframe:true,transparent:true,opacity:.28});mesh(new THREE.BoxGeometry(10.5,4.2,3.8),netMat,0,2.1,z>0?2:-2,g);g.position.z=z;scene.add(g)}
+goal(-31);goal(31);
+// Palm trees with curved trunks and broad fronds
+const trunkMat=mat(0x8a542c),leafMats=[mat(0x167447),mat(0x238c4b),mat(0x0d633d)];
+function palm(x,z,s=1){const group=new THREE.Group();const trunk=mesh(new THREE.CylinderGeometry(.24*s,.42*s,6*s,10),trunkMat,0,3*s,0,group);trunk.rotation.z=-.1;
+for(let i=0;i<9;i++){const a=i*Math.PI*2/9;const leaf=mesh(new THREE.ConeGeometry(.52*s,5.5*s,7),leafMats[i%3],Math.cos(a)*1.45*s,5.35*s,Math.sin(a)*1.45*s,group);leaf.rotation.z=Math.cos(a)*.9;leaf.rotation.x=Math.sin(a)*.9;leaf.rotation.x+=.3;}
+group.position.set(x,0,z);scene.add(group)}
+[-30,30].forEach(x=>[-43,-22,0,22,43].forEach((z,i)=>palm(x,z,i%2?.85:1.1)));
+for(let i=0;i<10;i++){const cloud=new THREE.Group();const cm=new THREE.MeshStandardMaterial({color:0xffffff,roughness:1});for(let j=0;j<4;j++)mesh(new THREE.SphereGeometry(2.1,12,10),cm,j*2.1,Math.sin(j)*.4,0,cloud);cloud.position.set(-45+i*10,30+(i%3)*4,-100-(i%2)*12);scene.add(cloud)}
+// Small beach-stadium stands and colorful spectators
+const standMat=mat(0x526779),seatMats=[mat(0xe94b4b),mat(0xf1c64b),mat(0xf4f4f4),mat(0x247bd1),mat(0x27a66a)];
+for(const side of [-1,1]){
+ const stand=cube(8,3.4,68,standMat,side*27,1.35,0);
+ for(let tier=0;tier<3;tier++){
+  const rowZ=-29+tier*1.1;
+  for(let n=0;n<42;n++){
+   const z=rowZ+n*1.42;
+   const x=side*(24.2+tier*.9);
+   const color=seatMats[(n+tier*7+(side>0?2:0))%seatMats.length];
+   const fan=mesh(new THREE.SphereGeometry(.24,8,7),color,x,3.4+tier*.22,z);
+   fan.scale.set(.85,1.25,.8);
+  }
+ }
+ // rails at front edge of the stands
+ const rail=cube(.12,.35,68,mat(0xd8e0e6,.4,.5),side*22.8,3.1,0);
+}
+ // corner floodlight poles
+for(const x of [-24,24])for(const z of [-36,36]){
+ const pole=mesh(new THREE.CylinderGeometry(.12,.18,13,8),mat(0x64717a),x,6.5,z);
+ const lamp=mesh(new THREE.BoxGeometry(2.8,.35,.8),mat(0xfaf4d8,.25),x,13,z);
+}
+// Player models with jersey, shorts, arms, boots
+const skin=mat(0xb97950),navy=mat(0x102e4e),sock=mat(0xf3f3f3),boot=mat(0x16191d),darkHair=mat(0x211b18);
+function playerModel(color,x,z,number){
+ const g=new THREE.Group(),shirt=mat(color,.58),trim=mat(0xffffff,.5);
+ // torso, shoulders and collar
+ mesh(new THREE.CapsuleGeometry(.53,.82,7,14),shirt,0,1.58,0,g);
+ mesh(new THREE.TorusGeometry(.19,.055,8,24),trim,0,2.08,0,g).rotation.x=Math.PI/2;
+ // neck and carefully shaped head
+ mesh(new THREE.CylinderGeometry(.13,.15,.23,12),skin,0,2.17,0,g);
+ mesh(new THREE.SphereGeometry(.32,24,18),skin,0,2.52,0,g);
+ mesh(new THREE.SphereGeometry(.325,18,12,0,Math.PI*2,0,Math.PI*.48),darkHair,0,2.68,0,g);
+ // face details on the front (+Z)
+ const eyeMat=mat(0x171717),whiteEye=mat(0xffffff);
+ for(const s of [-1,1]){
+  mesh(new THREE.SphereGeometry(.035,8,8),whiteEye,s*.105,2.56,.285,g);
+  mesh(new THREE.SphereGeometry(.018,8,8),eyeMat,s*.105,2.56,.315,g);
+  mesh(new THREE.SphereGeometry(.055,10,8),skin,s*.32,1.92,0,g);
+ }
+ // jersey number on chest
+ const numberCanvas=document.createElement('canvas');numberCanvas.width=128;numberCanvas.height=128;
+ const ctx=numberCanvas.getContext('2d');ctx.clearRect(0,0,128,128);ctx.fillStyle='#ffffff';ctx.font='bold 76px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(String(number),64,66);
+ const numberTex=new THREE.CanvasTexture(numberCanvas);numberTex.colorSpace=THREE.SRGBColorSpace;
+ const badge=new THREE.Mesh(new THREE.PlaneGeometry(.34,.42),new THREE.MeshBasicMaterial({map:numberTex,transparent:true,side:THREE.DoubleSide}));
+ badge.position.set(0,1.62,.515);g.add(badge);
+ const arms=[],legs=[],knees=[];
+ for(const s of [-1,1]){
+  const shoulder=new THREE.Group();shoulder.position.set(s*.55,1.91,0);g.add(shoulder);
+  mesh(new THREE.SphereGeometry(.19,12,10),shirt,0,0,0,shoulder);
+  const upper=mesh(new THREE.CapsuleGeometry(.13,.36,5,10),shirt,0,-.28,0,shoulder);
+  const elbow=mesh(new THREE.SphereGeometry(.12,10,8),skin,0,-.52,0,shoulder);
+  const fore=mesh(new THREE.CapsuleGeometry(.105,.34,5,10),skin,0,-.76,.015,shoulder);
+  arms.push(shoulder);
+  const legPivot=new THREE.Group();legPivot.position.set(s*.23,.92,0);g.add(legPivot);
+  mesh(new THREE.CapsuleGeometry(.17,.42,5,10),navy,0,-.25,0,legPivot);
+  mesh(new THREE.SphereGeometry(.16,10,8),skin,0,-.51,0,legPivot);
+  mesh(new THREE.CapsuleGeometry(.115,.36,5,10),sock,0,-.75,0,legPivot);
+  mesh(new THREE.BoxGeometry(.29,.16,.48),boot,0,-.99,.12,legPivot);
+  // small boot studs
+  for(let k=-1;k<=1;k++)mesh(new THREE.CylinderGeometry(.025,.025,.06,6),mat(0xb8b8b8),k*.085,-1.08,.27,legPivot);
+  legs.push(legPivot);knees.push(elbow);
+ }
+ // subtle colored sleeve bands
+ for(const s of [-1,1]){const band=mesh(new THREE.TorusGeometry(.135,.025,6,16),trim,s*.59,1.68,0,g);band.rotation.x=Math.PI/2;}
+ g.position.set(x,0,z);scene.add(g);g.userData={legs,arms,shirtMat:shirt};return g
+}
+const player=playerModel(0x0878e8,0,17,10),enemy=playerModel(0xe23c35,0,-17,9);
+// Goalkeepers: green kits, positioned in front of each goal
+const keeperA=playerModel(0x20a85a,-0.5,27.5,1),keeperB=playerModel(0xf0b52b,.5,-27.5,1);
+keeperA.scale.set(.94,1.05,.94);keeperB.scale.set(.94,1.05,.94);
+keeperA.userData.isKeeper=true;keeperB.userData.isKeeper=true;
+let celebrationUntil=0,celebrating=null;
+let gameStarted=false,gameEndAt=0,soundOn=true,audioCtx=null;
+function tone(freq,duration,type='sine',volume=.06){
+ if(!soundOn)return;
+ try{audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')audioCtx.resume();
+ const osc=audioCtx.createOscillator(),gain=audioCtx.createGain();osc.type=type;osc.frequency.setValueAtTime(freq,audioCtx.currentTime);
+ gain.gain.setValueAtTime(volume,audioCtx.currentTime);gain.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+duration);
+ osc.connect(gain);gain.connect(audioCtx.destination);osc.start();osc.stop(audioCtx.currentTime+duration);
+ }catch(e){}
+}
+function kickSound(){tone(150,.09,'triangle',.08)}
+function goalSound(){tone(520,.22,'sawtooth',.045);setTimeout(()=>tone(660,.28,'sawtooth',.05),130);setTimeout(()=>tone(790,.4,'sawtooth',.055),290)}
+function say(text){const el=document.getElementById('commentary');el.textContent=text;el.style.opacity=1;setTimeout(()=>el.style.opacity=0,2300)}
+document.getElementById('soundToggle').onclick=()=>{soundOn=!soundOn;document.getElementById('soundToggle').textContent=soundOn?'🔊 الصوت: تشغيل':'🔇 الصوت: إيقاف';if(soundOn)tone(500,.1)};
+document.getElementById('startGame').onclick=()=>{
+ const choice=document.getElementById('teamChoice').value;
+ player.userData.shirtMat.color.setHex(choice==='blue'?0x0878e8:0xe23c35);
+ enemy.userData.shirtMat.color.setHex(choice==='blue'?0xe23c35:0x0878e8);
+ scoreA=0;scoreB=0;reset();gameStarted=true;
+ gameEndAt=performance.now()+Number(document.getElementById('matchLength').value)*1000;
+ document.getElementById('menu').style.display='none';tone(740,.18,'sine',.05);say('صافرة البداية! بالتوفيق يا بطل');
+};
+// Ball with classic black pentagon patches
+const ballGroup=new THREE.Group();const ball=mesh(new THREE.SphereGeometry(.53,32,24),mat(0xffffff,.42),0,0,0,ballGroup);const patchMat=mat(0x171c20,.65);
+for(let i=0;i<12;i++){const a=i*Math.PI*2/12;const patch=mesh(new THREE.CircleGeometry(.13,5),patchMat,Math.cos(a)*.47,Math.sin(a)*.18,Math.sin(a)*.47,ballGroup);patch.lookAt(Math.cos(a)*2,Math.sin(a)*.5,Math.sin(a)*2)}
+ballGroup.position.set(0,.58,4);scene.add(ballGroup);
+let vx=0,vz=0,scoreA=0,scoreB=0;const keys={},move={};function bind(id,k){const el=document.getElementById(id);el.addEventListener('pointerdown',e=>{e.preventDefault();move[k]=1;el.setPointerCapture(e.pointerId)});['pointerup','pointercancel','lostpointercapture'].forEach(ev=>el.addEventListener(ev,()=>move[k]=0))}
+[['up','up'],['down','down'],['left','left'],['right','right']].forEach(a=>bind(...a));
+addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+function kick(power){const dx=ballGroup.position.x-player.position.x,dz=ballGroup.position.z-player.position.z;if(Math.hypot(dx,dz)<3.2){kickSound();vx=(dx/(Math.hypot(dx,dz)||1))*.32;vz=-power}}
+document.getElementById('shoot').onclick=()=>kick(1.45);document.getElementById('pass').onclick=()=>kick(.78);
+function reset(){ballGroup.position.set(0,.58,4);vx=0;vz=0;player.position.set(0,0,17);enemy.position.set(0,0,-17);player.rotation.set(0,0,0);enemy.rotation.set(0,0,0);player.userData.legs.forEach(l=>l.rotation.set(0,0,0));enemy.userData.legs.forEach(l=>l.rotation.set(0,0,0));celebrating=null}
+const clock=new THREE.Clock();function animate(){requestAnimationFrame(animate);const t=clock.getElapsedTime(),dt=Math.min(clock.getDelta(),.035);
+if(!gameStarted){renderer.render(scene,camera);return}
+if(performance.now()>gameEndAt){gameStarted=false;document.getElementById('menu').style.display='flex';document.querySelector('#menu .panel h1').textContent='انتهت المباراة';document.querySelector('#menu .panel p').textContent=`النتيجة النهائية: ${scoreA} - ${scoreB}`;document.getElementById('startGame').textContent='العب مرة أخرى';return}
+for(let i=0;i<waterPositions.count;i++){const x=waterBase[i*3],z=waterBase[i*3+2];waterPositions.array[i*3+1]=Math.sin(x*.11+t*1.2)*.13+Math.cos(z*.16+t*.8)*.1}waterPositions.needsUpdate=true;waterGeo.computeVertexNormals();
+let dx=(keys.a||keys.arrowleft||move.left?-1:0)+(keys.d||keys.arrowright||move.right?1:0),dz=(keys.w||keys.arrowup||move.up?-1:0)+(keys.s||keys.arrowdown||move.down?1:0);const len=Math.hypot(dx,dz)||1;dx/=len;dz/=len;
+const speed=10*dt;player.position.x=THREE.MathUtils.clamp(player.position.x+dx*speed,-19,19);player.position.z=THREE.MathUtils.clamp(player.position.z+dz*speed,-28,28);if(dx||dz)player.rotation.y=Math.atan2(dx,dz);
+player.userData.legs.forEach((l,i)=>l.rotation.x=Math.sin(t*11+i*Math.PI)*Math.hypot(dx,dz)*.62);player.userData.arms.forEach((a,i)=>a.rotation.x=Math.sin(t*11+i*Math.PI)*Math.hypot(dx,dz)*.42);
+const ex=ballGroup.position.x-enemy.position.x,ez=ballGroup.position.z-enemy.position.z,ed=Math.hypot(ex,ez)||1;enemy.position.x+=THREE.MathUtils.clamp(ex/ed*5*dt,-.12,.12);enemy.position.z+=THREE.MathUtils.clamp(ez/ed*5*dt,-.12,.12);enemy.rotation.y=Math.atan2(ex,ez);
+const px=ballGroup.position.x-player.position.x,pz=ballGroup.position.z-player.position.z;if(Math.hypot(px,pz)<1.35){vx+=px*.012;vz+=pz*.012}
+if(ed<1.25){vx+=ex*.008;vz+=.035}
+// Goalkeepers track the ball laterally and can parry close shots
+for(const [keeper,goalZ] of [[keeperA,27.5],[keeperB,-27.5]]){
+ const targetX=THREE.MathUtils.clamp(ballGroup.position.x,-4.4,4.4);
+ keeper.position.x+=(targetX-keeper.position.x)*Math.min(1,dt*3.5);
+ keeper.rotation.y=goalZ>0?Math.PI:0;
+ const nearGoal=Math.abs(ballGroup.position.z-goalZ)<3.0;
+ if(nearGoal&&Math.abs(ballGroup.position.x-keeper.position.x)<1.35){
+  vx+=(ballGroup.position.x-keeper.position.x)*.12;
+  vz+=(goalZ>0?-1:1)*.75;
+  ballGroup.position.z=goalZ>0?goalZ-2.7:goalZ+2.7;
+ }
+}
+ballGroup.position.x+=ballGroup.position.z+=vz;vx*=.988;vz*=.988;ballGroup.position.y=.58+Math.abs(Math.sin(t*9))*Math.min(.32,Math.hypot(vx,vz)*.22);ballGroup.rotation.x+=vz*.09;ballGroup.rotation.z-=vx*.09;
+if(Math.abs(ballGroup.position.x)>20){ballGroup.position.x=Math.sign(ballGroup.position.x)*20;vx*=-.6}
+if(ballGroup.position.z<-31.5&&Math.abs(ballGroup.position.x)<5.2){scoreA++;goalSound();say('جوووووول! هدف رائع!');celebrating=player;celebrationUntil=t+1.8;reset();celebrating=player;celebrationUntil=t+1.8}
+else if(ballGroup.position.z>31.5&&Math.abs(ballGroup.position.x)<5.2){scoreB++;goalSound();say('الخصم يسجل هدفاً!');celebrating=enemy;celebrationUntil=t+1.8;reset();celebrating=enemy;celebrationUntil=t+1.8}
+if(celebrating&&t<celebrationUntil){
+ celebrating.position.y=Math.abs(Math.sin((celebrationUntil-t)*9))*.8;
+ celebrating.userData.arms.forEach((a,i)=>{a.rotation.z=(i===0?-1:1)*1.05;a.rotation.x=-.5});
+ celebrating.userData.legs.forEach((l,i)=>{l.rotation.x=Math.sin(t*13+i*Math.PI)*.9});
+}else if(celebrating){celebrating.position.y=0;celebrating.userData.arms.forEach(a=>a.rotation.set(0,0,0));celebrating=null}
+document.getElementById('score').textContent=`أنت ${scoreA} - ${scoreB} الخصم`;
+camera.position.x+=(player.position.x*.24-camera.position.x)*.035;camera.position.z+=(player.position.z*.18+34-camera.position.z)*.035;camera.lookAt(player.position.x*.1,1,0);
+renderer.render(scene,camera)}
+animate();addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+})();
+</script></body></html>
